@@ -1,9 +1,10 @@
 #include "main.hpp"
+#include <list>
 #include <unistd.h>
 
 using std::cout;
 using std::string;
-using std::vector;
+using std::list;
 using std::ref;
 using std::thread;
 using std::to_string;
@@ -16,6 +17,12 @@ struct client_info {
     bool reader_failure = false;
     thread worker_thread;
 };
+
+void client_worker(client_info& client) {
+    client.reader_failure = true;
+    client.quit_reader = true;
+    std::cerr << "Client reader not implemented...\n";
+}
 
 int server() {
     cout << "Serving...\n";
@@ -46,24 +53,26 @@ int server() {
     }
 
     size_t client_count = 0;
-    vector<client_info> clients;
-    clients.reserve(MAX_CLIENTS);
+    list<client_info> clients;
 
     while (true) {
         using namespace std::chrono_literals;
 
-        for (int i = 0; i < clients.size(); i++) {
-            clients[i].worker_thread.join();
-            if (clients[i].quit_reader) {
-                if (close(clients[i].sock) == -1) {
-                    string call = string("close( ") + to_string(clients[i].addr)  + ")";
+        for (auto it = clients.begin(); it != clients.end();) {
+            client_info& client = *it;
+            if (client.quit_reader) {
+                client.worker_thread.join();
+                if (close(client.sock) == -1) {
+                    string call = string("close( ") + to_string(client.addr)  + ")";
                     errno_to_cerr(call.c_str());
                 }
-                clients.erase(clients.begin() + i);
+                it = clients.erase(it);
+            } else {
+                ++it;
             }
         }
 
-        if (clients.size() == clients.capacity()) {
+        if (clients.size() == MAX_CLIENTS) {
             std::this_thread::sleep_for(50ms);
             continue;
         }
@@ -78,11 +87,11 @@ int server() {
                 return EXIT_FAILURE;
             }
             std::this_thread::sleep_for(50ms);
-            clients.erase(clients.end() - 1);
+            clients.pop_back();
             continue;
         }
 
-        client.worker_thread = thread(reader, client.sock, ref(client.quit_reader), ref(client.reader_failure));
+        client.worker_thread = thread(client_worker, ref(client));
     }
     return EXIT_SUCCESS;
 }
