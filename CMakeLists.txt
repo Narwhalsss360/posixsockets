@@ -4,4 +4,8 @@ set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(PosixSocketsProject CXX)
-add_executable(main src/main.cpp)
+add_executable(main
+    src/main.cpp
+    src/client.cpp
+    src/server.cpp
+)
