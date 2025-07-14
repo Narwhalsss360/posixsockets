@@ -19,9 +19,46 @@ struct client_info {
 };
 
 void client_worker(client_info& client) {
-    client.reader_failure = true;
+    string str;
+    constexpr const size_t chunk_size = 16;
+    bool resize_required = true;
+    client.reader_failure = false;
+    while (!client.quit_reader) {
+        if (resize_required) {
+            str.resize(str.size() + chunk_size);
+            resize_required = false;
+        }
+
+        int received = recv(client.sock, &*str.end() - chunk_size, chunk_size, 0);
+
+        if (received == -1) {
+            if (errno != EWOULDBLOCK) {
+                errno_to_cerr("recv(...)");
+                client.reader_failure = true;
+                return;
+            }
+            continue;
+        } else if (received == 0) {
+            break;
+        }
+        resize_required = true;
+
+        if (received != chunk_size) {
+            str.resize(str.size() - chunk_size + received);
+        }
+
+        if (str.back() != '\0') {
+            continue;
+        }
+
+        cout << to_string(client.addr) << ' ' << str << '\n';
+
+        if (str == ".exit") {
+            break;
+        }
+        str.clear();
+    }
     client.quit_reader = true;
-    std::cerr << "Client reader not implemented...\n";
 }
 
 int server() {
