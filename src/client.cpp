@@ -1,8 +1,10 @@
 #include "main.hpp"
+#include <cstdlib>
 #include <netdb.h>
 #include <unistd.h>
 
 using std::cout;
+using std::cerr;
 using std::cin;
 using std::endl;
 using std::string;
@@ -10,6 +12,11 @@ using std::ref;
 using std::thread;
 
 int client(const char ip[]) {
+    if (ip == nullptr) {
+        cerr << "Must specify server IP Address." << endl;
+        return EXIT_FAILURE;
+    }
+
     cout << "Client...\n";
     int client = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP);
     if (client == -1) {

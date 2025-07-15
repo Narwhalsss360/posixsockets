@@ -76,15 +76,10 @@ int main(int argc, char* argv[]) {
         return server();
     }
 
-    if (strncmp(argv[1], CLIENT_ARGUMENT, CLIENT_ARGUMENT_LENGTH) != 0) {
-        cerr << "Must specify either:" << SERVER_ARGUMENT << "|" << CLIENT_ARGUMENT << endl;
-        return EXIT_FAILURE;
+    if (strncmp(argv[1], CLIENT_ARGUMENT, CLIENT_ARGUMENT_LENGTH) == 0) {
+        return client(argc < 3 ? nullptr : argv[2]);
     }
 
-    if (argc < 3) {
-        cerr << "Must specify server IP Address." << endl;
-        return EXIT_FAILURE;
-    }
-
-    return client(argv[2]);
+    cerr << "Must specify either:" << SERVER_ARGUMENT << "|" << CLIENT_ARGUMENT << endl;
+    return EXIT_FAILURE;
 }
