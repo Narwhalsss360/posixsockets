@@ -107,7 +107,7 @@ int hardware_concurrency_limit(int listener) {
             }
         }
 
-        if (clients.size() == MAX_CLIENTS) {
+        if (clients.size() == MAX_HARDWARE_CONCURRENCY) {
             std::this_thread::sleep_for(50ms);
             continue;
         }
@@ -137,9 +137,25 @@ int hardware_concurrency_limit(int listener) {
     return EXIT_SUCCESS;
 }
 
+void asynchronous_worker(list<client_info>& clients, mutex& clients_lock) {
+
+}
+
 int asynchronous_workers(int listener) {
-    cerr << "This method is not implemented.\n";
-    return EXIT_FAILURE;
+    list<client_info> assigned_clients[MAX_HARDWARE_CONCURRENCY];
+    mutex assigned_clients_lock[MAX_HARDWARE_CONCURRENCY];
+    thread workers[MAX_HARDWARE_CONCURRENCY];
+
+    for (int i = 0; i < MAX_HARDWARE_CONCURRENCY; i++) {
+        workers[i] = thread(asynchronous_worker, ref(assigned_clients[i]), ref(assigned_clients_lock[i]));
+    }
+
+    int next_assignment_index = MAX_HARDWARE_CONCURRENCY;
+    while (true) {
+        
+    }
+
+    return EXIT_SUCCESS;
 }
 
 constexpr const char HARDWARE_METHOD[] = "hardware";
@@ -176,7 +192,7 @@ int server(const char concurrency_method[]) {
         return EXIT_FAILURE;
     }
 
-    if (listen(listener, MAX_CLIENTS)) {
+    if (listen(listener, MAX_HARDWARE_CONCURRENCY)) {
         errno_to_cerr("listen(...)");
         return EXIT_FAILURE;
     }

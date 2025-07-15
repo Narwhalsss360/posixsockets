@@ -51,7 +51,7 @@ static void errno_to_cerr(const char* const call) {
 
 constexpr const uint16_t PORT = 54673;
 
-const size_t MAX_CLIENTS = std::thread::hardware_concurrency();
+const size_t MAX_HARDWARE_CONCURRENCY = std::thread::hardware_concurrency();
 
 constexpr const char* const CONTROL_SEQUENCE_INTRODUCER = "\x1B[";
 constexpr const char* const SAVE_CURRENT_CURSOR_POSITION = "s";
