@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (strncmp(argv[1], SERVER_ARGUMENT, SERVER_ARGUMENT_LENGTH) == 0) {
-        return server();
+        return server(argc < 3 ? nullptr : argv[2]);
     }
 
     if (strncmp(argv[1], CLIENT_ARGUMENT, CLIENT_ARGUMENT_LENGTH) == 0) {

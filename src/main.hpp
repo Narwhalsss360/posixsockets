@@ -89,7 +89,7 @@ static void print_above_restore(int line_count = 1, bool current_was_empty = fal
 
 void reader(int sock, bool& quit_reader, bool& reader_failure);
 
-int server();
+int server(const char concurrency_method[]);
 
 int client(const char ip[]);
 

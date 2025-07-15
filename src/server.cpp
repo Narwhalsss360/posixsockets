@@ -1,16 +1,21 @@
 #include "main.hpp"
+#include <cstdlib>
+#include <cstring>
 #include <list>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <mutex>
 
 using std::cout;
+using std::cerr;
 using std::string;
 using std::list;
 using std::ref;
 using std::thread;
 using std::to_string;
 using std::mutex;
+using std::strncmp;
+using std::size_t;
 
 struct client_info {
     int sock = -1;
@@ -132,7 +137,23 @@ int hardware_concurrency_limit(int listener) {
     return EXIT_SUCCESS;
 }
 
-int server() {
+int asynchronous_workers(int listener) {
+    cerr << "This method is not implemented.\n";
+    return EXIT_FAILURE;
+}
+
+constexpr const char HARDWARE_METHOD[] = "hardware";
+constexpr const size_t HARDWARE_METHOD_LENGTH = sizeof(HARDWARE_METHOD) / sizeof(HARDWARE_METHOD[0]);
+
+constexpr const char ASYNC_METHOD[] = "async";
+constexpr const size_t ASYNC_METHOD_LENGTH = sizeof(ASYNC_METHOD) / sizeof(ASYNC_METHOD[0]);
+
+int server(const char concurrency_method[]) {
+    if (concurrency_method == nullptr) {
+        cerr << "Must specify either '" << HARDWARE_METHOD << "' or '" << ASYNC_METHOD << "'\n";
+        return EXIT_FAILURE;
+    }
+
     cout << "Serving...\n";
 
     int listener = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP);
@@ -160,5 +181,12 @@ int server() {
         return EXIT_FAILURE;
     }
 
-    return hardware_concurrency_limit(listener);
+    if (strncmp(concurrency_method, HARDWARE_METHOD, HARDWARE_METHOD_LENGTH) == 0) {
+        return hardware_concurrency_limit(listener);
+    } else if (strncmp(concurrency_method, ASYNC_METHOD, ASYNC_METHOD_LENGTH) == 0) {
+        return asynchronous_workers(listener);
+    }
+
+    cerr << "Must specify either '" << HARDWARE_METHOD << "' or '" << ASYNC_METHOD << "'\n";
+    return EXIT_FAILURE;
 }
