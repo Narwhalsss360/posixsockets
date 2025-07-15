@@ -1,6 +1,7 @@
 #include "main.hpp"
 #include <list>
 #include <unistd.h>
+#include <mutex>
 
 using std::cout;
 using std::string;
@@ -8,6 +9,7 @@ using std::list;
 using std::ref;
 using std::thread;
 using std::to_string;
+using std::mutex;
 
 struct client_info {
     int sock = -1;
@@ -19,6 +21,8 @@ struct client_info {
 };
 
 void client_worker(client_info& client) {
+    static mutex cout_lock = mutex();
+
     string str;
     constexpr const size_t chunk_size = 16;
     bool resize_required = true;
@@ -51,7 +55,9 @@ void client_worker(client_info& client) {
             continue;
         }
 
+        cout_lock.lock();
         cout << to_string(client.addr) << ' ' << str << '\n';
+        cout_lock.unlock();
 
         if (str == ".exit") {
             break;
