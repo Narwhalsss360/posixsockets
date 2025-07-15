@@ -1,5 +1,6 @@
 #include "main.hpp"
 #include <list>
+#include <sys/socket.h>
 #include <unistd.h>
 #include <mutex>
 
@@ -20,8 +21,8 @@ struct client_info {
     thread worker_thread;
 };
 
-void client_worker(client_info& client) {
-    static mutex cout_lock = mutex();
+void client_worker(client_info& client, list<client_info>& all, mutex& all_lock) {
+    static mutex out_lock = mutex();
 
     string str;
     constexpr const size_t chunk_size = 16;
@@ -55,13 +56,26 @@ void client_worker(client_info& client) {
             continue;
         }
 
-        cout_lock.lock();
-        cout << to_string(client.addr) << ' ' << str << '\n';
-        cout_lock.unlock();
-
         if (str == ".exit") {
             break;
         }
+
+        string out = to_string(client.addr) + ' ' + str;
+        out_lock.lock();
+        cout << out << '\n';
+        all_lock.lock();
+        for (client_info& to_send : all) {
+            if (to_send.sock == -1) {
+                continue;
+            }
+
+            if (send(to_send.sock, out.c_str(), out.size() + 1, 0) == -1) {
+                string call = to_string(to_send.addr) + " send(...)";
+                errno_to_cerr(call.c_str());
+            }
+        }
+        all_lock.unlock();
+        out_lock.unlock();
         str.clear();
     }
     client.quit_reader = true;
@@ -97,13 +111,14 @@ int server() {
 
     size_t client_count = 0;
     list<client_info> clients;
+    mutex clients_lock = mutex();
 
     while (true) {
         using namespace std::chrono_literals;
 
         for (auto it = clients.begin(); it != clients.end();) {
             client_info& client = *it;
-            if (client.quit_reader) {
+            if (client.quit_reader || client.reader_failure) {
                 client.worker_thread.join();
                 if (close(client.sock) == -1) {
                     string call = string("close( ") + to_string(client.addr)  + ")";
@@ -120,7 +135,10 @@ int server() {
             continue;
         }
 
+        clients_lock.lock();
         clients.push_back({});
+        clients_lock.unlock();
+
         client_info& client = clients.back();
         client.sock = accept(listener, reinterpret_cast<sockaddr*>(&client.addr), &client.addr_len);
 
@@ -130,11 +148,13 @@ int server() {
                 return EXIT_FAILURE;
             }
             std::this_thread::sleep_for(50ms);
+            clients_lock.lock();
             clients.pop_back();
+            clients_lock.unlock();
             continue;
         }
 
-        client.worker_thread = thread(client_worker, ref(client));
+        client.worker_thread = thread(client_worker, ref(client), ref(clients), ref(clients_lock));
     }
     return EXIT_SUCCESS;
 }
