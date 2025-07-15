@@ -156,9 +156,10 @@ struct async_context {
 
     vector<mutex> locks;
     vector<vector<connection>> all;
+    mutex echo_lock;
 
     async_context(const int& worker_count)
-        : locks(vector<mutex>(worker_count)), all(worker_count) {}
+        : locks(vector<mutex>(worker_count)), all(worker_count), echo_lock(mutex()) {}
 };
 
 bool append_read_until_zero(int sock, string& str) {
@@ -198,6 +199,11 @@ void asynchronous_worker(async_context& context, const int index) {
     mutex& connections_lock = context.locks[index];
 
     while (true) {
+        context.echo_lock.lock();
+        defer([&]() {
+            context.echo_lock.unlock();
+        });
+
         connections_lock.lock();
         defer([&]() {
             using namespace std::chrono_literals;
@@ -233,7 +239,17 @@ void asynchronous_worker(async_context& context, const int index) {
             }
 
             string out = "(" + to_string(connections[i].addr) + ") " + message;
-            cerr << "ERROR replies not implemented | " << out << '\n';
+            for (vector<async_context::connection>& assigned : context.all) {
+                int i = 0;
+                for (async_context::connection& connection : assigned) {
+                    if (send(connection.sock, out.c_str(), out.size() + 1, 0) == -1) {
+                        string call = "worker[" + to_string(index) + "]: send(worker[" + to_string(i) + "]: " + to_string(connections[i].addr) + ")";
+                        errno_to_cerr(call.c_str());
+                    }
+                    i++;
+                }
+            }
+            cout << out << '\n';
 
             if (message.rfind(".exit", 0) == 0) {
                 disconnected.push_back(i);
