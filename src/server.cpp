@@ -21,7 +21,7 @@ struct client_info {
     thread worker_thread;
 };
 
-void client_worker(client_info& client, list<client_info>& all, mutex& all_lock) {
+void hardware_concurrency_worker(client_info& client, list<client_info>& all, mutex& all_lock) {
     static mutex out_lock = mutex();
 
     string str;
@@ -81,35 +81,7 @@ void client_worker(client_info& client, list<client_info>& all, mutex& all_lock)
     client.quit_reader = true;
 }
 
-int server() {
-    cout << "Serving...\n";
-
-    int listener = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP);
-    if (listener == -1) {
-        errno_to_cerr("socket(...)");
-        return EXIT_FAILURE;
-    }
-    defer([&]() {
-        if (close(listener) == -1) {
-            errno_to_cerr("close(listener)");
-        }
-    });
-
-    sockaddr_in all;
-    all.sin_family = AF_INET;
-    all.sin_addr.s_addr = 0;
-    all.sin_port = htons(PORT);
-    if (bind(listener, reinterpret_cast<sockaddr*>(&all), sizeof(all)) == -1) {
-        errno_to_cerr("bind(...)");
-        return EXIT_FAILURE;
-    }
-
-    if (listen(listener, MAX_CLIENTS)) {
-        return EXIT_FAILURE;
-        errno_to_cerr("listen(...)");
-    }
-
-    size_t client_count = 0;
+int hardware_concurrency_limit(int listener) {
     list<client_info> clients;
     mutex clients_lock = mutex();
 
@@ -154,7 +126,39 @@ int server() {
             continue;
         }
 
-        client.worker_thread = thread(client_worker, ref(client), ref(clients), ref(clients_lock));
+        client.worker_thread = thread(hardware_concurrency_worker, ref(client), ref(clients), ref(clients_lock));
     }
+
     return EXIT_SUCCESS;
+}
+
+int server() {
+    cout << "Serving...\n";
+
+    int listener = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP);
+    if (listener == -1) {
+        errno_to_cerr("socket(...)");
+        return EXIT_FAILURE;
+    }
+    defer([&]() {
+        if (close(listener) == -1) {
+            errno_to_cerr("close(listener)");
+        }
+    });
+
+    sockaddr_in all;
+    all.sin_family = AF_INET;
+    all.sin_addr.s_addr = 0;
+    all.sin_port = htons(PORT);
+    if (bind(listener, reinterpret_cast<sockaddr*>(&all), sizeof(all)) == -1) {
+        errno_to_cerr("bind(...)");
+        return EXIT_FAILURE;
+    }
+
+    if (listen(listener, MAX_CLIENTS)) {
+        errno_to_cerr("listen(...)");
+        return EXIT_FAILURE;
+    }
+
+    return hardware_concurrency_limit(listener);
 }
