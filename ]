@@ -5,7 +5,6 @@
 #include <list>
 #include <sys/poll.h>
 #include <sys/socket.h>
-#include <thread>
 #include <unistd.h>
 #include <poll.h>
 #include <mutex>
@@ -178,7 +177,7 @@ bool append_read_until_zero(int sock, string& str) {
             }
             return false;
         } else if (received == 0) {
-            return false;
+            break;
         }
         resize_required = true;
 
@@ -218,39 +217,19 @@ void asynchronous_worker(async_context& context, const int index) {
             continue;
         }
 
-        vector<int> disconnected;
         for (int i = 0; i < count; i++) {
             if (!(pollfds[i].revents & POLLIN)) {
                 continue;
             }
 
-            string message;
-            if (!append_read_until_zero(connections[i].sock, message)) {
+            string out = "(" + to_string(connections[i].addr) + ") ";
+            if (!append_read_until_zero(connections[i].sock, out)) {
                 string call = "worker[" + to_string(index) + "]: append_read_until_zero(" + to_string(connections[i].addr) + ")";
                 errno_to_cerr(call.c_str());
-                disconnected.push_back(i);
                 continue;
             }
 
-            string out = "(" + to_string(connections[i].addr) + ") " + message;
-            cerr << "ERROR replies not implemented | " << out << '\n';
-
-            if (message.rfind(".exit", 0) == 0) {
-                disconnected.push_back(i);
-            }
-        }
-
-        for (const int& to_erase : disconnected) {
-            if (shutdown(connections[to_erase].sock, SHUT_RDWR) == -1) {
-                string call = "worker[" + to_string(index) + "]: shutdown(" + to_string(connections[to_erase].addr) + ")";
-                errno_to_cerr(call.c_str());
-            }
-            if (close(connections[to_erase].sock) == -1) {
-                string call = "worker[" + to_string(index) + "]: close(" + to_string(connections[to_erase].addr) + ")";
-                errno_to_cerr(call.c_str());
-            }
-            connections.erase(connections.begin() + to_erase);
-            cout << to_string(connections[to_erase].addr) << " Disconected\n";
+            cerr << "ERROR replies not implemented " << out << '\n';
         }
     }
 }
@@ -297,30 +276,24 @@ int asynchronous_workers(int listener) {
             async_context::connection& client = clients.back();
             client.sock = accept(listener, reinterpret_cast<sockaddr*>(&client.addr), &client.addr_len);
             if (client.sock == -1) {
+
                 clients.pop_back();
+
                 errno_to_cerr("accept(...)");
                 continue;
             }
-            cout << to_string(client.addr) << " Connected\n";
         }
 
         int i = MAX_HARDWARE_CONCURRENCY;
-        while (true) {
+        while (i == MAX_HARDWARE_CONCURRENCY) {
             for (i = 0; i < MAX_HARDWARE_CONCURRENCY; i++) {
                 next_assignment_index = (next_assignment_index + i) % MAX_HARDWARE_CONCURRENCY;
-                if (context.all[next_assignment_index].size() != MAX_CONNECTIONS_PER_WORKER) {
+                if (context.all[next_assignment_index].size() != MAX_HARDWARE_CONCURRENCY) {
                     break;
                 }
             }
-
-            if (i == MAX_HARDWARE_CONCURRENCY) {
-                cerr << "Server at 100% load\n";
-                using namespace std::chrono_literals;
-                sleep_for(3s);
-            }
-
-            break;
         }
+
     }
 
     return EXIT_SUCCESS;
