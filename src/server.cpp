@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <poll.h>
 #include <mutex>
+#include <fcntl.h>
 
 using std::cout;
 using std::cerr;
@@ -356,7 +357,7 @@ int server(const char concurrency_method[]) {
 
     cout << "Serving...\n";
 
-    int listener = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP);
+    int listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listener == -1) {
         errno_to_cerr("socket(...)");
         return EXIT_FAILURE;
@@ -378,6 +379,19 @@ int server(const char concurrency_method[]) {
 
     if (listen(listener, MAX_HARDWARE_CONCURRENCY)) {
         errno_to_cerr("listen(...)");
+        return EXIT_FAILURE;
+    }
+
+    int fcntl_flags = fcntl(listener, F_GETFL, 0);
+    if (fcntl_flags == -1) {
+        errno_to_cerr("fcntl(..., F_GETFL, ...)");
+        return EXIT_FAILURE;
+    }
+
+    fcntl_flags |= O_NONBLOCK;
+
+    if (fcntl(listener, F_SETFL, fcntl_flags) == -1) {
+        errno_to_cerr("fcntl(..., F_SETFL, ...)");
         return EXIT_FAILURE;
     }
 

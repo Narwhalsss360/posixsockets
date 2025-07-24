@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <netdb.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 using std::cout;
 using std::cerr;
@@ -18,7 +19,7 @@ int client(const char ip[]) {
     }
 
     cout << "Client...\n";
-    int client = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP);
+    int client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (client == -1) {
         errno_to_cerr("socket(...)");
         return EXIT_FAILURE;
@@ -28,6 +29,19 @@ int client(const char ip[]) {
             errno_to_cerr("close(...)");
         }
     });
+
+    int fcntl_flags = fcntl(client, F_GETFL, 0);
+    if (fcntl_flags == -1) {
+        errno_to_cerr("fcntl(..., F_GETFL, ...)");
+        return EXIT_FAILURE;
+    }
+
+    fcntl_flags |= O_NONBLOCK;
+
+    if (fcntl(client, F_SETFL, fcntl_flags) == -1) {
+        errno_to_cerr("fcntl(..., F_SETFL, ...)");
+        return EXIT_FAILURE;
+    }
 
     sockaddr_in local;
     local.sin_family = AF_INET;
